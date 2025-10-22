@@ -1,0 +1,40 @@
+services:
+
+  database:
+    image: rafaelpraxedesliferayorg/dhi-mysql:8.0.43-fips
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=lportal
+    command: mysqld
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-fips-data:/var/lib/mysql
+
+  liferay:
+    user: root:root
+    build: ./liferay/
+    ports:
+      - "8081:8080"
+      - "11312:11311"
+      - "8001:8000"
+    depends_on:
+      - database
+      - search
+
+  search:
+    image: baseline/elasticsearch
+    build: ./elasticsearch/
+    environment:
+      - cluster.name=LiferayElasticsearchCluster
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "discovery.type=single-node"
+      - "node.name=es-node1"
+      - "xpack.security.enabled=false"
+    volumes:
+      - elastic-data:/usr/share/elasticsearch/data
+
+volumes:
+  elastic-data:
+  mysql-fips-data:
+    driver: local
