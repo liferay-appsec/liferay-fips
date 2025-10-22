@@ -3,7 +3,6 @@ CATALINA_OPTS="--add-opens java.base/java.lang=ALL-UNNAMED \
 --add-opens java.base/java.io=ALL-UNNAMED \
 --add-opens java.base/java.util=ALL-UNNAMED \
 --add-opens java.base/java.lang.invoke=ALL-UNNAMED \
--Dorg.osgi.framework.bootdelegation=org.bouncycastle.* \
 -Djava.security.properties==${LIFERAY_HOME}/java.security \
 -Dorg.bouncycastle.fips.approved_only=true \
 -Djavax.net.ssl.keyStoreType=BCFKS \

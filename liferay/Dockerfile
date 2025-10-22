@@ -18,13 +18,24 @@ WORKDIR ${LIFERAY_HOME}
 COPY --chown=${LIFERAY_USER}:${LIFERAY_GROUP} /bundle/*.zip .
 RUN unzip *.zip && mv liferay-dxp*/* . && rm -rf liferay-dxp* *.zip
 
-# COPY --chown=${LIFERAY_USER}:${LIFERAY_GROUP} configs/bouncycastle/*.jar tomcat/lib/
-# COPY --chown=${LIFERAY_USER}:${LIFERAY_GROUP} configs/jdbc-driver/*.jar /opt/liferay/tomcat/webapps/ROOT/WEB-INF/shielded-container-lib
-# COPY --chown=${LIFERAY_USER}:${LIFERAY_GROUP} configs/jdk/java.security ${LIFERAY_HOME}/
-# COPY --chown=${LIFERAY_USER}:${LIFERAY_GROUP} configs/tomcat/jvm.options tomcat/bin/setenv.sh
-# COPY --chown=${LIFERAY_USER}:${LIFERAY_GROUP} configs/osgi/configs/*.config osgi/configs
+# Copy Bouncycastle's JARs
+COPY --chown=${LIFERAY_USER}:${LIFERAY_GROUP} configs/bouncycastle/*.jar tomcat/lib/
 
-# --- Liferay Configuration ---
+# Copy mySQL's JDBC driver
+COPY --chown=${LIFERAY_USER}:${LIFERAY_GROUP} configs/jdbc-driver/*.jar /opt/liferay/tomcat/webapps/ROOT/WEB-INF/shielded-container-lib
+
+# Set boundycastle provider as the default java security provider
+COPY --chown=${LIFERAY_USER}:${LIFERAY_GROUP} configs/jdk/java.security ${LIFERAY_HOME}/
+
+# Setup elastic search as remote service
+COPY --chown=${LIFERAY_USER}:${LIFERAY_GROUP} configs/osgi/configs/*.config osgi/configs
+
+# Set tomcat setenv.sh
+COPY --chown=${LIFERAY_USER}:${LIFERAY_GROUP} configs/tomcat/jvm.options ${LIFERAY_HOME}/jvm.options.temp
+
+RUN cat ${LIFERAY_HOME}/jvm.options.temp >> tomcat/bin/setenv.sh && \
+    rm ${LIFERAY_HOME}/jvm.options.temp
+
 # Copy Liferay's portal-ext.properties
  COPY --chown=${LIFERAY_USER}:${LIFERAY_GROUP} configs/portal/portal-ext.properties ${LIFERAY_HOME}/
 
@@ -33,7 +44,6 @@ RUN chown -R ${LIFERAY_USER}:${LIFERAY_GROUP} ${LIFERAY_HOME}
 
 ENV JAVA_HOME=/opt/java/openjdk/21
 
-# --- Final Container Setup ---
 USER ${LIFERAY_USER}
 EXPOSE 8000
 EXPOSE 8080
