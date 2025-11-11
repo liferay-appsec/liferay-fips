@@ -17,15 +17,29 @@ services:
       - mysql-fips-data:/var/lib/mysql
 
   liferay:
-    user: root:root
-    build: ./liferay/
+    image: liferay-fips/dxp:latest
+    build:
+      context: .
+      dockerfile: liferay/Dockerfile
+      args:
+        LIFERAY_BASE_IMAGE: ${LIFERAY_BASE_IMAGE:-yourorg/dhi-eclipse-temurin:21.0-jdk-debian13-dev}
+    environment:
+      FIPS_MODE: "true"
+      JNDI_DB_USERNAME: root
+      JNDI_DB_PASSWORD_ALIAS: jndi_p_keystore
+      JNDI_KEYSTORE_PASSWORD: ${JNDI_KEYSTORE_PASSWORD:-changeit}
+      TOMCAT_KEYSTORE_PASSWORD: ${TOMCAT_KEYSTORE_PASSWORD:-changeit}
+      FIPS_TRUSTSTORE_PASSWORD: ${FIPS_TRUSTSTORE_PASSWORD:-changeit}
     ports:
       - "8081:8080"
+      - "8443:8443"
       - "11312:11311"
       - "8001:8000"
     depends_on:
       - database
       - search
+    volumes:
+      - liferay-data:/opt/liferay/data
 
   search:
     image: liferay-fips/elasticsearch:8.17.2-fips
@@ -42,5 +56,6 @@ services:
 
 volumes:
   elastic-data:
+  liferay-data:
   mysql-fips-data:
     driver: local

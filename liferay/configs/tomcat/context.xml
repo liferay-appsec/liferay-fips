@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Context>
+    <WatchedResource>WEB-INF/web.xml</WatchedResource>
+
+    <CredentialHandler
+        className="org.apache.catalina.storeconfig.KeyStoreCredentialHandler"
+        keyStoreFile="conf/jndi-keystore.bcfks"
+        keyStorePassword="${jndi.keystore.password}"
+        keyStoreType="BCFKS" />
+
+    <Resource
+        name="jdbc/LiferayPool"
+        auth="Container"
+        type="javax.sql.DataSource"
+        factory="org.apache.tomcat.jdbc.pool.DataSourceFactory"
+        driverClassName="com.mysql.cj.jdbc.Driver"
+        url="jdbc:mysql://database:3306/lportal?useUnicode=true&amp;characterEncoding=UTF-8&amp;sslMode=VERIFY_CA&amp;enabledTLSProtocols=TLSv1.2,TLSv1.3&amp;trustCertificateKeyStoreUrl=file:${catalina.base}/conf/fips-truststore.bcfks&amp;trustCertificateKeyStorePassword=${fips.truststore.password}&amp;trustCertificateKeyStoreType=BCFKS&amp;sslTrustStoreProvider=BCFIPS"
+        username="${jndi.db.username}"
+        password="${jndi.db.alias}"
+        maxActive="100"
+        maxIdle="30"
+        maxWait="10000"
+        testOnBorrow="true"
+        validationQuery="SELECT 1"
+        removeAbandoned="true"
+        removeAbandonedTimeout="60"
+        jdbcInterceptors="org.apache.tomcat.jdbc.pool.interceptor.ConnectionState;org.apache.tomcat.jdbc.pool.interceptor.StatementFinalizer" />
+</Context>
