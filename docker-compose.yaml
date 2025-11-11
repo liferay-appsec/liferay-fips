@@ -28,14 +28,15 @@ services:
       - search
 
   search:
-    image: baseline/elasticsearch
-    build: ./elasticsearch/
+    image: liferay-fips/elasticsearch:8.17.2-fips
+    build:
+      context: .
+      dockerfile: elasticsearch/Dockerfile
+      args:
+        ELASTIC_BASE_IMAGE: ${ELASTIC_BASE_IMAGE:-docker.elastic.co/elasticsearch/elasticsearch:8.17.2}
     environment:
-      - cluster.name=LiferayElasticsearchCluster
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - "discovery.type=single-node"
-      - "node.name=es-node1"
-      - "xpack.security.enabled=false"
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:-elasticFips!2024}
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
     volumes:
       - elastic-data:/usr/share/elasticsearch/data
 
