@@ -1,10 +1,15 @@
 services:
 
   database:
-    image: rafaelpraxedesliferayorg/dhi-mysql:8.0.43-fips
+    image: liferay-fips/mysql:8.0.43-fips
+    build:
+      context: .
+      dockerfile: mysql/Dockerfile
+      args:
+        MYSQL_BASE_IMAGE: ${MYSQL_BASE_IMAGE:-mysql:8.0}
     environment:
-      - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_DATABASE=lportal
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: lportal
     command: mysqld
     ports:
       - "3307:3306"
