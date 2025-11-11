@@ -1,1 +1,5 @@
 liferay-dxp-*.zip
+liferay-dxp-*.tar.gz
+activation-*.xml
+bin/
+fips.key
