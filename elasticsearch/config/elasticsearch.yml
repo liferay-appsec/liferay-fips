@@ -1,0 +1,32 @@
+cluster.name: LiferayElasticsearchCluster
+node.name: es-node1
+network.host: 0.0.0.0
+discovery.type: single-node
+
+# Enable Elastic security + TLS with a FIPS-approved cipher suite list
+xpack.security.enabled: true
+xpack.security.fips_mode.enabled: true
+
+xpack.security.http.ssl:
+  enabled: true
+  verification_mode: certificate
+  key: certs/elastic-node.key
+  certificate: certs/elastic-node.crt
+  certificate_authorities: [ "certs/elastic-ca.crt" ]
+  supported_protocols: [ "TLSv1.2", "TLSv1.3" ]
+  cipher_suites:
+    - TLS_AES_256_GCM_SHA384
+    - TLS_AES_128_GCM_SHA256
+
+xpack.security.transport.ssl:
+  enabled: true
+  verification_mode: certificate
+  key: certs/elastic-node.key
+  certificate: certs/elastic-node.crt
+  certificate_authorities: [ "certs/elastic-ca.crt" ]
+  supported_protocols: [ "TLSv1.2", "TLSv1.3" ]
+  cipher_suites:
+    - TLS_AES_256_GCM_SHA384
+    - TLS_AES_128_GCM_SHA256
+
+action.destructive_requires_name: true
