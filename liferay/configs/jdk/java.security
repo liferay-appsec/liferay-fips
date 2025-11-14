@@ -19,3 +19,7 @@ securerandom.defaultAlgorithm=DRBG:SUN
 
 # 4. Set the default keystore type to the FIPS-compliant BCFKS
 keystore.type=BCFKS
+ssl.TrustManagerFactory.provider=BCJSSE
+ssl.TrustManagerFactory.algorithm=PKIX
+ssl.KeyManagerFactory.provider=BCJSSE
+ssl.KeyManagerFactory.algorithm=PKIX
