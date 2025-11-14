@@ -1,0 +1,5 @@
+Premain-Class: com.liferay.fips.tomcat.TomcatUrlHandlerDisabler
+Agent-Class: com.liferay.fips.tomcat.TomcatUrlHandlerDisabler
+Can-Redefine-Classes: false
+Can-Retransform-Classes: false
+

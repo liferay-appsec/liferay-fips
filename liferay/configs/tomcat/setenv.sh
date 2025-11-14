@@ -55,3 +55,9 @@ else
 fi
 
 export CATALINA_OPTS
+
+RUN_JAVA_WRAPPER="${LIFERAY_HOME}/tomcat/bin/run-java-wrapper.sh"
+require_file "Tomcat JVM wrapper" "${RUN_JAVA_WRAPPER}"
+if [ -x "${RUN_JAVA_WRAPPER}" ]; then
+    _RUNJAVA="${RUN_JAVA_WRAPPER}"
+fi

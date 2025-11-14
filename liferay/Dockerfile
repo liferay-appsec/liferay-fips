@@ -59,7 +59,18 @@ RUN chmod 600 ${LIFERAY_HOME}/data/fips.key
 COPY liferay/configs/tomcat/context.xml ${LIFERAY_HOME}/tomcat/conf/context.xml
 COPY liferay/configs/tomcat/server.xml ${LIFERAY_HOME}/tomcat/conf/server.xml
 COPY liferay/configs/tomcat/setenv.sh ${LIFERAY_HOME}/tomcat/bin/setenv.sh
-RUN chmod +x ${LIFERAY_HOME}/tomcat/bin/setenv.sh
+COPY liferay/configs/tomcat/run-java-wrapper.sh ${LIFERAY_HOME}/tomcat/bin/run-java-wrapper.sh
+COPY liferay/configs/tomcat/support ${LIFERAY_HOME}/tomcat/support-src
+RUN set -eux; \
+    chmod +x ${LIFERAY_HOME}/tomcat/bin/setenv.sh ${LIFERAY_HOME}/tomcat/bin/run-java-wrapper.sh; \
+    mkdir -p ${LIFERAY_HOME}/tomcat/support-classes; \
+    javac -cp ${LIFERAY_HOME}/tomcat/lib/catalina.jar \
+        -d ${LIFERAY_HOME}/tomcat/support-classes \
+        ${LIFERAY_HOME}/tomcat/support-src/*.java; \
+    jar cfm ${LIFERAY_HOME}/tomcat/lib/tomcat-url-handler-disabler.jar \
+        ${LIFERAY_HOME}/tomcat/support-src/MANIFEST.MF \
+        -C ${LIFERAY_HOME}/tomcat/support-classes .; \
+    rm -rf ${LIFERAY_HOME}/tomcat/support-src ${LIFERAY_HOME}/tomcat/support-classes
 
 # User-provided keystores/truststores
 COPY liferay/configs/tomcat/security/keystore.bcfks ${LIFERAY_HOME}/tomcat/conf/keystore.bcfks
