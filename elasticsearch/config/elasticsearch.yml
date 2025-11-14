@@ -13,10 +13,10 @@ xpack.security.http.ssl:
   key: certs/elastic-node.key
   certificate: certs/elastic-node.crt
   certificate_authorities: [ "certs/elastic-ca.crt" ]
-  supported_protocols: [ "TLSv1.2", "TLSv1.3" ]
+  supported_protocols: [ "TLSv1.2" ]
   cipher_suites:
-    - TLS_AES_256_GCM_SHA384
-    - TLS_AES_128_GCM_SHA256
+    - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+    - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 
 xpack.security.transport.ssl:
   enabled: true
@@ -24,9 +24,11 @@ xpack.security.transport.ssl:
   key: certs/elastic-node.key
   certificate: certs/elastic-node.crt
   certificate_authorities: [ "certs/elastic-ca.crt" ]
-  supported_protocols: [ "TLSv1.2", "TLSv1.3" ]
+  supported_protocols: [ "TLSv1.2" ]
   cipher_suites:
-    - TLS_AES_256_GCM_SHA384
-    - TLS_AES_128_GCM_SHA256
+    - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+    - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+
+xpack.license.self_generated.type: trial
 
 action.destructive_requires_name: true
