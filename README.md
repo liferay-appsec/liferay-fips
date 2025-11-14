@@ -1,209 +1,269 @@
-## 🛡️ Liferay DXP FIPS 140-3 Reference Stack
+## 🛡️ Liferay DXP FIPS 140‑3 Reference Stack
 
-This repository assembles a Docker-based environment that keeps **Liferay DXP**, **MySQL**, and **Elasticsearch** inside a FIPS 140-3 compliant perimeter. The images are purposely minimal: they only assemble what you provide. All TLS certificates, keystores, truststores, and encryption keys must be created **before** you build the containers.
+This repository assembles a Docker-based environment that keeps **Liferay DXP**, **MySQL**, and **Elasticsearch** inside a FIPS 140‑3 perimeter. Every image is intentionally bare-bones: they only copy what you place under `configs/` or `certs/`, so you keep full control over keys, ciphers, and provider versions.
 
 | Service | Image | Highlights |
 | :-- | :-- | :-- |
-| `database` | `liferay-fips/mysql:8.0.43-fips` | Hardened `mysql:8.0.43` derivative, enforces TLS 1.2/1.3, strict cipher suites, and `ssl_fips_mode=STRICT`. |
-| `liferay` | `liferay-fips/dxp:latest` | Eclipse Temurin 21 base, bundles Bouncy Castle FIPS jars, consumes user-provided keystores/FIPS keys, connects to MySQL + Elasticsearch through TLS. |
-| `search` | `liferay-fips/elasticsearch:8.17.2-fips` | Elasticsearch 8.17 with `xpack.security.fips_mode.enabled`, requires user-supplied CA + node certificate. |
+| `database` | `liferay-fips/mysql:8.0.43-fips` | Hardened `mysql:8.0.43`, TLS-only, `ssl_fips_mode=STRICT`, user-supplied cert chain. |
+| `liferay` | `liferay-fips/dxp:latest` | Temurin 21 + Bouncy Castle FIPS JSSE. Loads your keystore, truststore, and AES secrets. |
+| `search` | `liferay-fips/elasticsearch:8.17.2-fips` | Runs Elastic 8 in FIPS mode (requires Platinum/trial license) with your CA + node certs. |
 
 ---
 
-## 📂 Repository Layout
+## Repository layout
 
 ```
 .
 ├── docker-compose.yaml
-├── elasticsearch
-│   ├── certs/               # Drop elastic-ca.crt, elastic-node.crt, elastic-node.key here.
-│   ├── config/elasticsearch.yml
+├── elasticsearch/
+│   ├── certs/        # elastic-ca.crt, elastic-node.crt, elastic-node.key
+│   ├── config/
+│   │   └── elasticsearch.yml
 │   └── Dockerfile
-├── liferay
-│   ├── bundle/              # Liferay DXP bundle (.zip/.tar.gz) + activation key.
-│   ├── configs
-│   │   ├── bouncycastle/    # Bouncy Castle FIPS jars (already provided).
-│   │   ├── jdbc-driver/     # MySQL Connector/J (already provided).
-│   │   ├── jdk/java.security
-│   │   ├── osgi/configs/    # Remote Elasticsearch configuration.
-│   │   ├── portal/          # portal-ext.properties + FIPS AES key (user provided).
-│   │   └── tomcat/          # context.xml, server.xml, setenv.sh, security README.
+├── liferay/
+│   ├── bundle/       # Liferay DXP bundle (.zip/.tar.gz) + activation key
+│   ├── configs/
+│   │   ├── bouncycastle/     # bc-fips, bcpkix-fips, bctls-fips, bcutil-fips jars
+│   │   ├── jdbc-driver/      # MySQL Connector/J
+│   │   ├── jdk/java.security # overrides SunJSSE with BC JSSE
+│   │   ├── osgi/configs/     # Remote Elasticsearch config
+│   │   ├── portal/           # portal-ext.properties + fips.key
+│   │   └── tomcat/
+│   │        ├── security/           # keystore.bcfks (HTTPS) + fips-truststore.bcfks
+│   │        ├── support/            # TomcatUrlHandlerDisabler agent sources
+│   │        ├── context.xml         # TLS-enabled MySQL datasource
+│   │        ├── server.xml          # HTTPS connector bound to BCFKS keystore
+│   │        ├── setenv.sh           # Injects BC FIPS jars + JVM options
+│   │        └── run-java-wrapper.sh # Normalizes -Djava.protocol.handler.pkgs before catalina.sh runs
 │   └── Dockerfile
-└── mysql
-    ├── certs/               # MySQL TLS CA/server cert/key (replace with your own).
+├── tools/                   # Utility scripts (e.g., keystore helpers, TLS inspectors)
+└── mysql/
+    ├── certs/        # MySQL CA/server cert/key
     ├── my.cnf
     └── Dockerfile
 ```
 
 ---
 
-## 🔑 Bring Your Own FIPS Assets
+## Required artifacts
 
-Only the bundle extraction is automated. Everything else must be created ahead of time and copied into the folders noted below. Replace the sample commands with your real subject names, passwords, and storage policies.
+### MySQL (`mysql/certs/`)
 
-### 1. MySQL TLS Materials (`mysql/certs/`)
+Drop `ca.pem`, `server-cert.pem`, and `server-key.pem`. See `mysql/certs/README.md` for sample OpenSSL commands. `mysql/my.cnf` already loads them and enforces TLS 1.2/1.3 with FIPS-friendly cipher suites.
 
-Required files: `ca.pem`, `server-cert.pem`, `server-key.pem`.
-
-Example (OpenSSL):
+<details>
+<summary>Sample OpenSSL flow</summary>
 
 ```bash
 cd mysql/certs
 openssl genrsa -out ca-key.pem 4096
 openssl req -x509 -new -key ca-key.pem -sha384 -days 3650 -out ca.pem -subj "/CN=mysql-ca"
 openssl genrsa -out server-key.pem 4096
-openssl req -new -key server-key.pem -out server.csr -subj "/CN=mysql"
+openssl req -new -key server-key.pem -out server.csr -subj "/CN=database" \
+  -addext "subjectAltName=DNS:database,IP:127.0.0.1"
 openssl x509 -req -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
-  -out server-cert.pem -days 825 -sha384 -extfile <(printf "subjectAltName=DNS:database,IP:127.0.0.1")
+  -out server-cert.pem -days 825 -sha384 -extensions san \
+  -extfile <(printf "[san]\nsubjectAltName=DNS:database,IP:127.0.0.1")
 chmod 600 server-key.pem
 rm -f ca-key.pem server.csr
 ```
 
-`mysql/my.cnf` already enables TLS 1.2/1.3, enforces FIPS cipher suites, and sets `ssl_fips_mode=STRICT`. Adjust the paths if you relocate the certs.
+</details>
 
-### 2. Liferay / Tomcat Security Assets
+### Liferay / Tomcat (`liferay/configs/`)
 
-Place the following files before building the Liferay image:
+| File | Purpose |
+| :-- | :-- |
+| `portal/fips.key` | 32-byte AES key for `passwords.encryption.key.provider=file`. |
+| `tomcat/security/keystore.bcfks` | HTTPS certificate for 8443. Store type **must** be BCFKS. |
+| `tomcat/security/fips-truststore.bcfks` | Trusts MySQL + Elasticsearch CAs. Also BCFKS. |
+| `tomcat/server.xml` | HTTPS connector already wired for the keystore/truststore paths. |
+| `tomcat/context.xml` | JNDI datasource with TLS-only MySQL URL and keystore-based password injection. |
+| `bouncycastle/*.jar` | `bc-fips`, `bcutil-fips`, `bcpkix-fips`, `bctls-fips` jars from the **same** BC FIPS release. |
 
-| File | Path | Purpose | How to create |
-| :-- | :-- | :-- | :-- |
-| `keystore.bcfks` | `liferay/configs/tomcat/security/keystore.bcfks` | HTTPS certificate for Tomcat (port 8443). | Generate with Bouncy Castle FIPS provider (`keytool -genkeypair ... -storetype BCFKS`). Password must match `TOMCAT_KEYSTORE_PASSWORD`. |
-| `fips-truststore.bcfks` | same folder | Trusts the MySQL and Elasticsearch CAs for outbound TLS. | Import each CA cert with `keytool -importcert ...`. Password must match `FIPS_TRUSTSTORE_PASSWORD`. |
-| `jndi-keystore.bcfks` | same folder | Stores the database password referenced by the `KeyStoreCredentialHandler`. | `keytool -importpass -alias <JNDI_DB_PASSWORD_ALIAS>`; store password = `JNDI_KEYSTORE_PASSWORD`. |
-| `fips.key` | `liferay/configs/portal/fips.key` | 32-byte base64 string used by `passwords.encryption.key.provider`. | `openssl rand -base64 32 > liferay/configs/portal/fips.key`. |
-| `server.xml` | `liferay/configs/tomcat/server.xml` | Tomcat descriptor already wired for HTTPS + TLS truststore. Customize as needed. |
+> **BC FIPS tooling:** Oracle `keytool` needs both `bc-fips` and `bcutil-fips` on `-providerpath`. Example:
+>
+> ```bash
+> BC_FIPS_JAR=bc-fips-2.1.2.jar
+> BC_UTIL_JAR=bcutil-fips-2.1.5.jar
+> PROVIDERS="liferay/configs/bouncycastle/${BC_FIPS_JAR}:liferay/configs/bouncycastle/${BC_UTIL_JAR}"
+> keytool -genkeypair ... \
+>   -storetype BCFKS \
+>   -providerclass org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider \
+>   -providerpath "${PROVIDERS}"
+> ```
 
-> **Bouncy Castle jars (required for both v1 and v2 lines):** place all of the following in `liferay/configs/bouncycastle/`: `bc-fips-*.jar`, `bcutil-fips-*.jar`, `bcpkix-fips-*.jar`, and `bctls-fips-*.jar`. All jars **must** come from the same Bouncy Castle FIPS release. Mixing v1 and v2 artifacts leads to missing-class errors (e.g., `org.bouncycastle.asn1.eac.EACObjectIdentifiers`) when Tomcat builds the JSSE context.
-
-Sample keystore creation (requires Bouncy Castle FIPS jars already in `liferay/configs/bouncycastle`):
+<details>
+<summary>Generate HTTPS keystore + truststore</summary>
 
 ```bash
-BC_JAR=bc-fips-1.0.2.6.jar
-JAVA_HOME=/path/to/jdk
+BC_FIPS_JAR=bc-fips-2.1.2.jar
+BC_UTIL_JAR=bcutil-fips-2.1.5.jar
+PROVIDERS="liferay/configs/bouncycastle/${BC_FIPS_JAR}:liferay/configs/bouncycastle/${BC_UTIL_JAR}"
 
-# HTTPS keystore
 keytool -genkeypair \
   -alias liferay-https \
-  -dname "CN=liferay, OU=DXP, O=Example, L=Remote, S=Remote, C=US" \
+  -dname "CN=liferay,OU=DXP,O=Example,L=Remote,ST=Remote,C=US" \
   -keyalg RSA -keysize 3072 -validity 3650 \
   -storepass "$TOMCAT_KEYSTORE_PASSWORD" \
   -keypass "$TOMCAT_KEYSTORE_PASSWORD" \
   -keystore liferay/configs/tomcat/security/keystore.bcfks \
   -storetype BCFKS \
   -providerclass org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider \
-  -providerpath liferay/configs/bouncycastle/$BC_JAR
+  -providerpath "${PROVIDERS}"
 
-# Truststore (import MySQL + Elasticsearch CAs)
 for CA in mysql/certs/ca.pem elasticsearch/certs/elastic-ca.crt; do
   keytool -importcert -noprompt \
-    -alias "$(basename $CA)" \
+    -alias "$(basename "$CA")" \
     -file "$CA" \
     -storepass "$FIPS_TRUSTSTORE_PASSWORD" \
     -keystore liferay/configs/tomcat/security/fips-truststore.bcfks \
     -storetype BCFKS \
     -providerclass org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider \
-    -providerpath liferay/configs/bouncycastle/$BC_JAR
+    -providerpath "${PROVIDERS}"
 done
-
-# JNDI password keystore (use the helper tool)
-javac -cp liferay/configs/bouncycastle/$BC_JAR -d tools/bin tools/ImportPassword.java
-
-java -cp tools/bin:liferay/configs/bouncycastle/$BC_JAR \
-  -Djava.security.properties=liferay/configs/jdk/java.security \
-  tools.ImportPassword \
-  liferay/configs/tomcat/security/jndi-keystore.bcfks \
-  "$JNDI_KEYSTORE_PASSWORD" \
-  "$JNDI_DB_PASSWORD_ALIAS" \
-  "$JNDI_KEYSTORE_PASSWORD" \
-  "$MYSQL_ROOT_PASSWORD"
 ```
 
-### 3. Elasticsearch TLS Materials (`elasticsearch/certs/`)
+</details>
 
-Required files: `elastic-ca.crt`, `elastic-node.crt`, `elastic-node.key`. They are referenced by `elasticsearch/config/elasticsearch.yml` for both HTTP and transport layers.
+### Elasticsearch (`elasticsearch/certs/`)
 
-Example:
+Provide `elastic-ca.crt`, `elastic-node.crt`, `elastic-node.key`. The CA must also be imported into Liferay’s truststore. Because Elastic requires Platinum (or trial) licensing for FIPS mode, run:
+
+```bash
+curl -k -u elastic:elasticFips!2024 \
+  -XPOST https://search:9200/_license/start_trial?acknowledge=true
+```
+
+before you re-enable `xpack.security.fips_mode`.
+
+<details>
+<summary>Sample node certificate</summary>
 
 ```bash
 cd elasticsearch/certs
 openssl genrsa -out elastic-ca.key 4096
-openssl req -x509 -new -key elastic-ca.key -sha384 -days 3650 -out elastic-ca.crt -subj "/CN=elastic-ca"
+openssl req -x509 -new -key elastic-ca.key -sha384 -days 3650 \
+  -out elastic-ca.crt -subj "/CN=elastic-ca"
 openssl genrsa -out elastic-node.key 4096
 openssl req -new -key elastic-node.key -out elastic-node.csr -subj "/CN=search" \
   -addext "subjectAltName=DNS:search,IP:127.0.0.1"
 openssl x509 -req -in elastic-node.csr -CA elastic-ca.crt -CAkey elastic-ca.key -CAcreateserial \
-  -out elastic-node.crt -days 825 -sha384 -extensions san -extfile <(printf "[san]\nsubjectAltName=DNS:search,IP:127.0.0.1")
+  -out elastic-node.crt -days 825 -sha384 -extensions san \
+  -extfile <(printf "[san]\nsubjectAltName=DNS:search,IP:127.0.0.1")
 chmod 600 elastic-node.key
 rm -f elastic-ca.key elastic-node.csr
 ```
 
-Remember to import `elastic-ca.crt` into Liferay’s truststore (`fips-truststore.bcfks`).
+</details>
 
 ---
 
-## ⚙️ Environment Variables
+## Helper components
 
-| Variable | Default | Description |
+To keep the stack stable under FIPS+BC JSSE, we ship a few custom utilities:
+
+| Helper | File | Why it exists |
 | :-- | :-- | :-- |
-| `MYSQL_ROOT_PASSWORD` | `root` | MySQL root password. Must match the password stored in `jndi-keystore.bcfks`. |
-| `FIPS_MODE` | `true` | Toggles the Bouncy Castle FIPS provider overrides for Liferay. |
-| `TOMCAT_KEYSTORE_PASSWORD` | `changeit` | Protects `keystore.bcfks`. |
-| `FIPS_TRUSTSTORE_PASSWORD` | `changeit` | Protects `fips-truststore.bcfks`. |
-| `JNDI_KEYSTORE_PASSWORD` | `changeit` | Protects `jndi-keystore.bcfks`. |
-| `JNDI_DB_PASSWORD_ALIAS` | `jdbc_liferay_password` | Alias that stores the DB password inside `jndi-keystore.bcfks`. |
-| `JNDI_DB_USERNAME` | `root` | Username injected into the Tomcat `Resource`. |
-| `ELASTIC_PASSWORD` | `elasticFips!2024` | Password for the built-in `elastic` user (keep in sync with the OSGi config). |
+| **Protocol normalizer** | `liferay/configs/tomcat/run-java-wrapper.sh` | Tomcat’s scripts and Liferay both append `-Djava.protocol.handler.pkgs`. The wrapper deduplicates/merges them before invoking `java`. |
+| **URL handler agent** | `liferay/configs/tomcat/support/TomcatUrlHandlerDisabler.java` + `MANIFEST.MF` | Equinox also registers a `URLStreamHandlerFactory`. The agent clears Tomcat’s factory just before Equinox loads so we avoid `java.lang.Error: factory already defined`. |
+| **Trust manager override** | `liferay/configs/jdk/java.security` | Forces BC JSSE to provide the default KeyManager/TrustManager factories. This sidesteps JDK 21’s call into `ExtendedSSLSession.getStatusResponses()` that the BC classes don’t implement. |
+| **BC keystore helper** | `tools/ImportPassword.java` | Tiny CLI utility that inserts plaintext secrets (e.g., DB passwords) into a BCFKS keystore using the BC FIPS provider. Use this if you prefer not to keep cleartext passwords in `setenv.sh`. |
 
-Set them in your shell or via a `.env` file before running `docker compose`.
+These helpers are copied and built as part of the Liferay Dockerfile; you don’t need to run anything manually.
+
+<details>
+<summary>Using <code>ImportPassword</code></summary>
+
+```bash
+cd tools
+javac -cp ../liferay/configs/bouncycastle/bc-fips-2.1.2.jar tools/ImportPassword.java
+java -cp .:../liferay/configs/bouncycastle/bc-fips-2.1.2.jar \
+     tools.ImportPassword \
+     /path/to/keystore.bcfks keystorePass alias entryPass "MyPassword!"
+```
+
+This writes a secret entry into an existing BCFKS keystore—handy if you want to remove `JNDI_DB_PASSWORD` from the environment and reference the keystore instead.
+
+</details>
 
 ---
 
-## 🚀 Build & Run
+## Environment variables
 
-1. Populate every required asset described above.
-2. Place the Liferay DXP bundle archive (and activation key) in `liferay/bundle/`.
-3. Build and start:
+| Variable | Default | Notes |
+| :-- | :-- | :-- |
+| `MYSQL_ROOT_PASSWORD` | `root` | Used by the container health check. |
+| `FIPS_MODE` | `true` | Adds the BC `java.security` override + FIPS JVM flags. |
+| `JNDI_DB_USERNAME` / `JNDI_DB_PASSWORD` | `liferay` / `SuperSecure!` | Passed to Tomcat as `-Djndi.db.*` and injected into `context.xml`. |
+| `TOMCAT_KEYSTORE_PASSWORD` / `FIPS_TRUSTSTORE_PASSWORD` | `liferay` | Change to match your BCFKS files. |
+| `ELASTIC_PASSWORD` | `elasticFips!2024` | Keep in sync with the OSGi config (`com.liferay.portal.search.elasticsearch7.configuration.ElasticsearchConfiguration.config`). |
+
+Place them in `.env` or export them before running `docker compose`.
+
+---
+
+## Build & run
+
+1. Copy the Liferay DXP bundle archive (and activation key) into `liferay/bundle/`.
+2. Populate every artifact described above (keystores, truststores, certs, `fips.key`, BC jars).
+3. Start the stack:
 
 ```bash
 docker compose up --build
 ```
 
-After the containers start:
-
-| Component | URL / Host | Notes |
-| :-- | :-- | :-- |
-| Liferay HTTP | http://localhost:8081 | Default connector. |
-| Liferay HTTPS | https://localhost:8443 | Uses your `keystore.bcfks`. |
-| MySQL | localhost:3307 | TLS-only. |
-| Elasticsearch | https://search:9200 (inside network) | TLS + basic auth enabled. |
-
-Shutdown and cleanup:
+Liferay waits for the MySQL health check before booting. To tear everything down:
 
 ```bash
 docker compose down -v
 ```
 
+### Endpoints
+
+| Component | URL / Host | Description |
+| :-- | :-- | :-- |
+| Liferay HTTP | `http://localhost:8081` | Default connector (behind Tomcat). |
+| Liferay HTTPS | `https://localhost:8443` | Uses your BCFKS keystore. |
+| MySQL | `localhost:3307` | TLS-only, connects with the `liferay` user/password. |
+| Elasticsearch | `https://search:9200` (Compose network) | Requires the `elastic` basic-auth credentials. |
+
 ---
 
-## 🔍 Elasticsearch + Liferay Integration
+## Elasticsearch ↔ Liferay config
 
-* `liferay/configs/osgi/configs/com.liferay.portal.search.elasticsearch7.configuration.ElasticsearchConfiguration.config` points to `https://search:9200`, enables TLS, and expects the truststore to contain `elastic-ca.crt`.
-* Update `ELASTIC_PASSWORD` (compose) and the `.config` file together when rotating credentials.
-* If you change the Elasticsearch hostname/certificates, regenerate the truststore and update the configuration accordingly.
+* `liferay/configs/osgi/configs/com.liferay.portal.search.elasticsearch7.configuration.ElasticsearchConfiguration.config`
+  * `networkHostAddresses=["https://search:9200"]`
+  * `httpSSLEnabled=true`, `truststoreType=BCFKS`, `truststorePath=/opt/liferay/tomcat/conf/fips-truststore.bcfks`
+  * `username="elastic"`, `password="elasticFips!2024"`
+* Update the truststore every time you rotate the Elastic CA.
+* Ensure the Elastic container runs with `xpack.security.fips_mode.enabled=true` **and** a Platinum/trial license. Without that license Elastic refuses to start; with FIPS disabled the BC JSSE stack hits the missing `getStatusResponses()` call.
 
 ---
 
-## 🔁 Switching Between Normal and FIPS Mode
+## Switching FIPS mode
 
-The Liferay container checks `FIPS_MODE` at runtime:
+The Liferay container honors `FIPS_MODE`:
 
 ```bash
 FIPS_MODE=false docker compose up liferay
 ```
 
-Disabling FIPS skips the `java.security` override but still uses your keystore/truststore. Re-enable with `FIPS_MODE=true` for production parity.
+* `true` (default): uses `liferay/configs/jdk/java.security`, injects BC FIPS providers, and enables the extra TLS safeguards.
+* `false`: launches Liferay with the stock Temurin security providers (useful for debugging non-FIPS regressions).
 
 ---
+
+## Known follow-up work
+
+This stack boots, connects to MySQL/Elasticsearch, and exposes HTTPS, but there are still application-level errors caused by the stricter BC FIPS providers (e.g., DRBG `Number of bits per request limited to 262144` in `SecureRandomUtil`). Those are intentionally **not** masked here—the objective is to give you a reproducible baseline where those issues can be addressed inside the Liferay codebase.
+
+If you hit TLS issues again, verify:
+
+1. All BC jars come from the same release.
+2. The truststore contains both MySQL and Elasticsearch CAs.
+3. Elasticsearch is running with a Platinum/trial license and `xpack.security.fips_mode.enabled=true`.
+4. The BC helper jars are on the boot classpath (look for `-Xbootclasspath/a:/opt/liferay/tomcat/lib/bc-fips-...` in the JVM arguments).
 
 ## ✅ Verification Tips
 
