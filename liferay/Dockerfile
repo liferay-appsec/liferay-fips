@@ -9,18 +9,10 @@ ENV LIFERAY_HOME=/opt/liferay \
     JAVA_HOME=/opt/java/openjdk/21
 
 ARG TOMCAT_KEYSTORE_PASSWORD=changeit
-ARG MYSQL_TRUSTSTORE_PASSWORD=changeit
-ARG JNDI_KEYSTORE_PASSWORD=changeit
-ARG JNDI_DB_PASSWORD_ALIAS=jdbc_liferay_password
 ARG JNDI_DB_USERNAME=root
-ARG JDBC_DEFAULT_PASSWORD=root
 
 ENV TOMCAT_KEYSTORE_PASSWORD=${TOMCAT_KEYSTORE_PASSWORD} \
-    MYSQL_TRUSTSTORE_PASSWORD=${MYSQL_TRUSTSTORE_PASSWORD} \
-    JNDI_KEYSTORE_PASSWORD=${JNDI_KEYSTORE_PASSWORD} \
-    JNDI_DB_PASSWORD_ALIAS=${JNDI_DB_PASSWORD_ALIAS} \
-    JNDI_DB_USERNAME=${JNDI_DB_USERNAME} \
-    JDBC_DEFAULT_PASSWORD=${JDBC_DEFAULT_PASSWORD}
+    JNDI_DB_USERNAME=${JNDI_DB_USERNAME}
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends adduser ca-certificates gzip tar tree unzip && \
@@ -72,7 +64,6 @@ RUN chmod +x ${LIFERAY_HOME}/tomcat/bin/setenv.sh
 # User-provided keystores/truststores
 COPY liferay/configs/tomcat/security/keystore.bcfks ${LIFERAY_HOME}/tomcat/conf/keystore.bcfks
 COPY liferay/configs/tomcat/security/fips-truststore.bcfks ${LIFERAY_HOME}/tomcat/conf/fips-truststore.bcfks
-COPY liferay/configs/tomcat/security/jndi-keystore.bcfks ${LIFERAY_HOME}/tomcat/conf/jndi-keystore.bcfks
 
 # Ensure correct ownership of all files
 RUN chown -R ${LIFERAY_USER}:${LIFERAY_GROUP} ${LIFERAY_HOME}
