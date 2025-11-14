@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Context>
     <WatchedResource>WEB-INF/web.xml</WatchedResource>
+    <WatchedResource>WEB-INF/tomcat-web.xml</WatchedResource>
+    <WatchedResource>${catalina.base}/conf/web.xml</WatchedResource>
 
-    <CredentialHandler
-        className="org.apache.catalina.storeconfig.KeyStoreCredentialHandler"
-        keyStoreFile="conf/jndi-keystore.bcfks"
-        keyStorePassword="${jndi.keystore.password}"
-        keyStoreType="BCFKS" />
+    <Manager pathname="SESSIONS.ser" />
 
     <Resource
         name="jdbc/LiferayPool"
@@ -14,9 +12,9 @@
         type="javax.sql.DataSource"
         factory="org.apache.tomcat.jdbc.pool.DataSourceFactory"
         driverClassName="com.mysql.cj.jdbc.Driver"
-        url="jdbc:mysql://database:3306/lportal?useUnicode=true&amp;characterEncoding=UTF-8&amp;sslMode=VERIFY_CA&amp;enabledTLSProtocols=TLSv1.2,TLSv1.3&amp;trustCertificateKeyStoreUrl=file:${catalina.base}/conf/fips-truststore.bcfks&amp;trustCertificateKeyStorePassword=${fips.truststore.password}&amp;trustCertificateKeyStoreType=BCFKS&amp;sslTrustStoreProvider=BCFIPS"
+        url="jdbc:mysql://database:3306/lportal?useUnicode=true&amp;characterEncoding=UTF-8&amp;sslMode=VERIFY_CA&amp;enabledTLSProtocols=TLSv1.2"
         username="${jndi.db.username}"
-        password="${jndi.db.alias}"
+        password="${jndi.db.password}"
         maxActive="100"
         maxIdle="30"
         maxWait="10000"

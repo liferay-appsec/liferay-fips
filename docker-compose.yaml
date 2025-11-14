@@ -34,9 +34,8 @@ services:
         LIFERAY_BASE_IMAGE: ${LIFERAY_BASE_IMAGE:-yourorg/dhi-eclipse-temurin:21.0-jdk-debian13-dev}
     environment:
       FIPS_MODE: "true"
-      JNDI_DB_USERNAME: root
-      JNDI_DB_PASSWORD_ALIAS: jndi_p_keystore
-      JNDI_KEYSTORE_PASSWORD: ${JNDI_KEYSTORE_PASSWORD:-changeit}
+      JNDI_DB_USERNAME: ${JNDI_DB_USERNAME:-liferay}
+      JNDI_DB_PASSWORD: ${JNDI_DB_PASSWORD:-liferay}
       TOMCAT_KEYSTORE_PASSWORD: ${TOMCAT_KEYSTORE_PASSWORD:-changeit}
       FIPS_TRUSTSTORE_PASSWORD: ${FIPS_TRUSTSTORE_PASSWORD:-changeit}
     ports:
