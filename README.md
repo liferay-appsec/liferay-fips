@@ -317,7 +317,7 @@ If you hit TLS issues again, verify:
 * **Tomcat HTTPS**: `openssl s_client -connect localhost:8443 -tls1_3 -servername liferay`.
 * **MySQL TLS**: `mysql --ssl-mode=VERIFY_CA --ssl-ca=mysql/certs/ca.pem -h 127.0.0.1 -P 3307 -u root -p`.
 * **Elasticsearch TLS**: `curl --cacert elasticsearch/certs/elastic-ca.crt -u elastic:$ELASTIC_PASSWORD https://localhost:9200`.
-* **Bouncy Castle FIPS**: Deploy the `fips_verify.jsp` snippet from the original guide inside `tomcat/webapps/ROOT` to confirm `FipsStatus.isReady()`.
+* **Bouncy Castle FIPS**: Deploy the `fips_verify.jsp` snippet inside `tomcat/webapps/ROOT` and go to `https://<host>:8443/fips_verify.jsp` to confirm `FipsStatus.isReady()`.
 
 ---
 
