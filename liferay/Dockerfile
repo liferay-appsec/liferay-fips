@@ -1,4 +1,4 @@
-ARG LIFERAY_BASE_IMAGE=rafaelpraxedesliferayorg/dhi-eclipse-temurin:21.0-jdk-debian13-dev
+ARG LIFERAY_BASE_IMAGE=yourorg/dhi-eclipse-temurin:21.0-jdk-debian13
 FROM ${LIFERAY_BASE_IMAGE}
 
 ENV LIFERAY_HOME=/opt/liferay \
@@ -82,6 +82,9 @@ RUN set -eux; \
 # User-provided keystores/truststores
 COPY liferay/configs/tomcat/security/keystore.bcfks ${LIFERAY_HOME}/tomcat/conf/keystore.bcfks
 COPY liferay/configs/tomcat/security/fips-truststore.bcfks ${LIFERAY_HOME}/tomcat/conf/fips-truststore.bcfks
+
+# Optional verification page
+COPY liferay/configs/tomcat/root/fips_verify.jsp ${LIFERAY_HOME}/tomcat/webapps/ROOT/fips_verify.jsp
 
 # Ensure correct ownership of all files
 RUN chown -R ${LIFERAY_USER}:${LIFERAY_GROUP} ${LIFERAY_HOME}
