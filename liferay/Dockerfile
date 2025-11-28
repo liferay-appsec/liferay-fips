@@ -72,6 +72,13 @@ RUN set -eux; \
         -C ${LIFERAY_HOME}/tomcat/support-classes .; \
     rm -rf ${LIFERAY_HOME}/tomcat/support-src ${LIFERAY_HOME}/tomcat/support-classes
 
+# Overlay patched SecureRandomUtil directly into portal-kernel (built from security-ext)
+COPY security-ext/build/classes/java/main/com/liferay/portal/kernel/security/ /tmp/patches/com/liferay/portal/kernel/security/
+RUN set -eux; \
+    cd ${LIFERAY_HOME}/tomcat/webapps/ROOT/WEB-INF/shielded-container-lib; \
+    jar uf portal-kernel.jar -C /tmp/patches com; \
+    rm -rf /tmp/patches
+
 # User-provided keystores/truststores
 COPY liferay/configs/tomcat/security/keystore.bcfks ${LIFERAY_HOME}/tomcat/conf/keystore.bcfks
 COPY liferay/configs/tomcat/security/fips-truststore.bcfks ${LIFERAY_HOME}/tomcat/conf/fips-truststore.bcfks

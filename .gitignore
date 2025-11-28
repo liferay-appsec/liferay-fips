@@ -3,3 +3,5 @@ liferay-dxp-*.tar.gz
 activation-*.xml
 bin/
 fips.key
+.gradle
+security-ext/build
