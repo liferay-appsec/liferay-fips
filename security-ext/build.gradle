@@ -1,0 +1,47 @@
+buildscript {
+    dependencies {
+        classpath group: "com.liferay", name: "com.liferay.gradle.plugins", version: "latest.release"
+    }
+    repositories {
+        maven {
+            url "https://repository-cdn.liferay.com/nexus/content/groups/public"
+        }
+    }
+}
+
+apply plugin: "java"
+apply plugin: "war"
+apply plugin: "com.liferay.plugin"
+
+// Use legacy docroot layout for ext
+webAppDirName = "docroot"
+
+sourceCompatibility = JavaVersion.VERSION_17
+targetCompatibility = JavaVersion.VERSION_17
+
+repositories {
+    maven {
+        url "https://repository-cdn.liferay.com/nexus/content/groups/public"
+    }
+    mavenCentral()
+}
+
+dependencies {
+    // Compile against the portal-kernel from the bundled DXP
+    compileOnly files("${projectDir}/lib/portal-kernel.jar")
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ["docroot/WEB-INF/ext-service/src"]
+        }
+        resources {
+            srcDirs = []
+        }
+    }
+}
+
+war {
+    archiveFileName = "security-ext.war"
+}
