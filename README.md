@@ -31,14 +31,17 @@ This repository assembles a Docker-based environment that keeps **Liferay DXP**,
 │   │   └── tomcat/
 │   │        ├── security/           # keystore.bcfks (HTTPS) + fips-truststore.bcfks
 │   │        ├── support/            # TomcatUrlHandlerDisabler agent sources
+│   │        ├── root/               # Optional JSPs (e.g., fips_verify.jsp)
 │   │        ├── context.xml         # TLS-enabled MySQL datasource
 │   │        ├── server.xml          # HTTPS connector bound to BCFKS keystore
 │   │        ├── setenv.sh           # Injects BC FIPS jars + JVM options
 │   │        └── run-java-wrapper.sh # Normalizes -Djava.protocol.handler.pkgs before catalina.sh runs
 │   └── Dockerfile
+├── security-ext/           # Ext module with patched SecureRandomUtil + build.gradle
 ├── tools/                   # Utility scripts (e.g., keystore helpers, TLS inspectors)
 └── mysql/
-    ├── certs/        # MySQL CA/server cert/key
+    ├── certs/         # MySQL CA/server cert/key
+    ├── initdb.d/      # SQL init scripts (creates liferay user with SSL)
     ├── my.cnf
     └── Dockerfile
 ```
@@ -189,13 +192,57 @@ This writes a secret entry into an existing BCFKS keystore—handy if you want t
 
 ---
 
+## Patching `SecureRandomUtil` for BC FIPS (ext plugin)
+
+Liferay’s stock `SecureRandomUtil` requests more than 262,144 bits from the BC FIPS DRBG and triggers `Number of bits per request limited to 262144`. The `security-ext` module ships a patched version that chunks requests to BC’s limit.
+
+1) Ensure `security-ext/build.gradle` uses the same portal API version as your bundle (already set to `2025.q3.0` for this stack).
+2) Extract the portal kernel from the DXP bundle once (needed for compileOnly):
+   ```bash
+   tar -xOf liferay/bundle/liferay-dxp-tomcat-2025.q3.0.tar.gz \
+     liferay-dxp/tomcat/webapps/ROOT/WEB-INF/shielded-container-lib/portal-kernel.jar \
+     > security-ext/lib/portal-kernel.jar
+   ```
+3) Build the ext WAR with Dockerized Gradle (no wrapper in repo). Use JDK 17 to match the portal classes; root avoids tmp/permission issues inside the container:
+   ```bash
+   docker run --rm -u root \
+     -v "$PWD":/home/gradle/project \
+     -w /home/gradle/project/security-ext \
+     gradle:8-jdk17 gradle clean war
+   ```
+4) Bake the patched class into the image: the `liferay/Dockerfile` now overlays `SecureRandomUtil.class` into `portal-kernel.jar` if it exists at `security-ext/build/classes/java/main/com/liferay/portal/kernel/security/SecureRandomUtil.class`. Always rebuild the ext **before** building the Liferay image so the class is present.
+5) Build and start Liferay:
+   ```bash
+   docker compose build liferay
+   docker compose up -d liferay
+   ```
+6) Verify the patched class is present:
+   ```bash
+   docker compose exec liferay sh -c "jar tf /opt/liferay/tomcat/webapps/ROOT/WEB-INF/shielded-container-lib/portal-kernel.jar | grep SecureRandomUtil"
+   ```
+   If it shows up, the BC DRBG limit patch is in effect at bootstrap.
+
+## Base image customization
+
+The default Liferay base image is set to `yourorg/liferay-base:21.0-jdk-debian13` in both `liferay/Dockerfile` and `docker-compose.yaml`. Replace `yourorg` (and the tag) with your own registry/image name if you publish a customized base image.
+
+## FIPS verification page
+
+An optional JSP at `liferay/configs/tomcat/root/fips_verify.jsp` is copied into `tomcat/webapps/ROOT/`. After rebuilding and starting Liferay, open `https://<host>:8443/fips_verify.jsp` (or `http://<host>:8080/fips_verify.jsp` if HTTP is enabled) to confirm the BC FIPS provider is installed and in approved-only mode.
+
+## Post-compose: create the database user
+
+When starting from clean volumes, the MySQL image now seeds the `liferay` user (`liferay`/`liferay`) automatically via `mysql/initdb.d/01-create-liferay.sql` and enforces SSL. If you change `JNDI_DB_PASSWORD`, update that SQL accordingly and rebuild the MySQL image.
+
+---
+
 ## Environment variables
 
 | Variable | Default | Notes |
 | :-- | :-- | :-- |
 | `MYSQL_ROOT_PASSWORD` | `root` | Used by the container health check. |
 | `FIPS_MODE` | `true` | Adds the BC `java.security` override + FIPS JVM flags. |
-| `JNDI_DB_USERNAME` / `JNDI_DB_PASSWORD` | `liferay` / `SuperSecure!` | Passed to Tomcat as `-Djndi.db.*` and injected into `context.xml`. |
+| `JNDI_DB_USERNAME` / `JNDI_DB_PASSWORD` | `liferay` / `liferay` | Passed to Tomcat as `-Djndi.db.*` and injected into `context.xml`. |
 | `TOMCAT_KEYSTORE_PASSWORD` / `FIPS_TRUSTSTORE_PASSWORD` | `liferay` | Change to match your BCFKS files. |
 | `ELASTIC_PASSWORD` | `elasticFips!2024` | Keep in sync with the OSGi config (`com.liferay.portal.search.elasticsearch7.configuration.ElasticsearchConfiguration.config`). |
 
