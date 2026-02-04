@@ -251,6 +251,23 @@ Place them in `.env` or export them before running `docker compose`.
 ---
 
 ## Build & run
+### Quick setup
+
+1. At root, create a `.env` file like the following:
+  ```env
+    JNDI_DB_USERNAME=appsectest_jndi_db_username
+    JNDI_DB_PASSWORD=appsectest_jndi_db_pw
+    TOMCAT_KEYSTORE_PASSWORD=appsectest_tomcat_keystore_pw
+    FIPS_TRUSTSTORE_PASSWORD=appsectest_fips_trustore_pw
+    ELASTIC_PASSWORD=appsectest_elastic_pw
+    LIFERAY_BASE_IMAGE=YOUR_ORG/dhi-eclipse-temurin:21.0-jdk-debian13-dev
+    ACTIVATION_KEY_PATH=PATH_TO_ACTIVATION_KEY/activation-key.xml
+  ```
+2. Run `setup.sh` and make sure it runs sucessfully
+3. Run `docker compose --env-file .env up --build`
+4. Liferay should be running at https://localhost:8443
+
+### Tips for running manually
 
 1. Copy the Liferay DXP bundle archive (and activation key) into `liferay/bundle/`.
 2. Populate every artifact described above (keystores, truststores, certs, `fips.key`, BC jars).
