@@ -118,7 +118,7 @@ override_credentials_on_configs() {
   ELASTIC_SEARCH_CONFIG=com.liferay.portal.search.elasticsearch7.configuration.ElasticsearchConfiguration.config
   SQL_CREATE_USER_FILE=01-create-liferay.sql
   
-  sed -i "3s/liferay/$JNDI_DB_USERNAME/g; 4s/liferay/$JNDI_DB_PASSWORD/g; 5s/liferay/$JNDI_DB_USERNAME/g" mysql/initdb.d/$SQL_CREATE_USER_FILE
+  sed -i "3s/liferay/$JNDI_DB_USERNAME/g; 4s/liferay/$JNDI_DB_USERNAME/g; 5s/liferay/$JNDI_DB_PASSWORD/g; 6s/liferay/$JNDI_DB_USERNAME/g" mysql/initdb.d/$SQL_CREATE_USER_FILE
   sed -i "8s/elasticFips!2024/$ELASTIC_PASSWORD/g; 11s/liferay/$FIPS_TRUSTSTORE_PASSWORD/g" liferay/configs/osgi/configs/$ELASTIC_SEARCH_CONFIG
 
   echo -e "Overrided credentials on files: $SQL_CREATE_USER_FILE and $ELASTIC_SEARCH_CONFIG"
